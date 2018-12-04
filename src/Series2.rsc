@@ -29,7 +29,7 @@ keyword Keywords = "swap" | "test" | "foreach";
  */
   
 Statement desugar((Statement)`swap <Id x>, <Id y>;`)
-  = /* you should replace this */ dummyStat();
+  = (Statement) `(function() { var tmp = <Id x>; <Id x> = <Id y>; <Id y> = tmp; })();`;
 
 test bool testSwap()
   = desugar((Statement)`swap x, y;`)
@@ -44,14 +44,18 @@ test bool testSwap()
  */
 
 Statement desugar((Statement)`test <Expression x> should be <Expression y>;`)
-  = /* you should replace this */ dummyStat();
+  = (Statement) `(function (actual, expected) {
+                ' 	 if (actual !== expected) {
+                '     console.log("Test failed; expected: " + expected + "; got: " + actual);    
+  			    '   };
+                '})(<Expression x>, <Expression y>);`;
   
 test bool testTest()
   = desugar((Statement)`test 3 * 3 should be 9;`)
   == (Statement)`(function(actual, expected) { 
   			    '   if (actual !== expected) {
   			    '     console.log("Test failed; expected: " + expected + "; got: " + actual);    
-  			    '   }
+  			    '   };
   			    '})(3 * 3, 9);`;
 
 /*
@@ -60,7 +64,12 @@ test bool testTest()
  
   
 Statement desugar((Statement)`foreach (var <Id x> in <Expression e>) <Statement s>`)
-  = /* you should replace this */ dummyStat();
+  = (Statement)`(function(arr) {
+  			    '  for (var i = 0; i \< arr.length; i++) { 
+                '    var x = arr[i]; 
+                '    <Statement s>
+                '  };
+                '})(<Expression e>);`;
   
 
 test bool testForeach()
@@ -69,7 +78,7 @@ test bool testForeach()
   			    '  for (var i = 0; i \< arr.length; i++) { 
                 '    var x = arr[i]; 
                 '    print(x);
-                '  }
+                '  };
                 '})([1, 2, 3]);`;
  
 /*
@@ -77,15 +86,21 @@ test bool testForeach()
  */
  
 
-Expression desugar((Expression)`<Id param> =\> <Expression body>`)
-  = /* you should replace this */ dummyExp();
+Expression desugar((Expression)`<Id param> =\> <Expression body>`) {
+  Expression e = replaceThis(body);
+  return (Expression)`(function (_this) { 
+                 '   return function (<Id param>) { 
+                 '      return <Expression e>; 
+                 '   }; 
+                 '})(this)`;
+}
 
 Expression replaceThis(Expression e) {
   return top-down-break visit (e) {
     case Function _ : ; 
     case (Expression)`this` => (Expression)`_this`
   }
-}
+} 
 
 test bool testArrowNoThis()
   = desugar((Expression)`x =\> (x + 1)`)
